@@ -4,16 +4,19 @@ import networkx as nx
 from tqdm import tqdm
 
 
+max_frame_number = 0 # This is used to keep track of the maximum frame number in the dataset
 
-
+# Set the directory containing the text files
 def generate_graphs(input_directory, output_directory, spatial_threshold):
-
 
     def euclidean_distance(center1, center2):
         return np.sqrt((center1[0] - center2[0]) ** 2 + (center1[1] - center2[1]) ** 2)
 
     def load_data_from_file(file_path, frame_number):
         data = []
+        global max_frame_number # This is used to keep track of the maximum frame number in the dataset
+        if frame_number > max_frame_number:
+            max_frame_number = frame_number
         with open(file_path, 'r') as f:
             for line in f:
                 # Assuming each line in the text file is in the format: sperm_id class x_center y_center width height
@@ -32,20 +35,12 @@ def generate_graphs(input_directory, output_directory, spatial_threshold):
         
         dataset.extend(load_data_from_file(file_path, frame_number))
 
-    # count the number of text files in the directory
-    def count_files(directory):
-        return len([file for file in os.listdir(directory) if file.endswith('.txt')])
-
-    number_of_frames = count_files(data_directory)  # Set the total number of frames in your dataset
-
-    frame_graphs = [nx.Graph() for _ in range(number_of_frames)]
+    # Create the graphs
+    frame_graphs = [nx.Graph() for _ in range(max_frame_number + 1)]
 
     for sperm_id, class_name, yolo_coordinates, frame_number in dataset:
         #frame_graphs[frame_number].add_node(sperm_id, class_name=str(class_name), coordinates=list(yolo_coordinates))
-        frame_graphs[frame_number].add_node(sperm_id, class_name=class_name, x_center=yolo_coordinates[0], y_center=yolo_coordinates[1], width=yolo_coordinates[2], height=yolo_coordinates[3])
-
-
-    #spatial_threshold = spatial_threshold # Set an appropriate threshold based on your data, this is based on the YOLO coordinates
+        frame_graphs[frame_number].add_node(sperm_id, frame_number=frame_number, class_name=class_name, x_center=yolo_coordinates[0], y_center=yolo_coordinates[1], width=yolo_coordinates[2], height=yolo_coordinates[3])
 
     for frame_graph in frame_graphs:
         for sperm_id1, data1 in frame_graph.nodes(data=True):
@@ -99,16 +94,18 @@ if __name__ == '__main__':
 
     input_root_dir = "/work/vajira/DATA/VISEM-Tracking-from_kaggle/VISEM_Tracking_Train_v4/Train"
     
-    spatial_thresholds = [0.10, 0.20, 0.30, 0.40, 0.50]
+    spatial_thresholds = [0.10, 0.20, 0.30, 0.40, 0.50] # This is the maximum distance between two nodes for them to be connected in the graph
     
-    for spatial_threshold in tqdm(spatial_thresholds):
+    # Iterate through the spatial thresholds
+    for spatial_threshold in tqdm(spatial_thresholds): 
         output_root_dir = "/work/vajira/DATA/visem-tracking-graphs" + "/spatial_threshold_" + str(spatial_threshold)
         os.makedirs(output_root_dir, exist_ok=True) 
 
+        # Iterate through the files in the input directory
         for dir in tqdm(os.listdir(input_root_dir)):
             input_directory = os.path.join(input_root_dir, dir, "labels_ftid")
             output_directory = os.path.join(output_root_dir, dir)
             os.makedirs(output_directory, exist_ok=True)
             
-
+            # Generate the graphs and save them to disk
             generate_graphs(input_directory, output_directory, spatial_threshold)
